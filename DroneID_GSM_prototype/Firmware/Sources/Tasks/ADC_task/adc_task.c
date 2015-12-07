@@ -53,7 +53,7 @@ void get_adc_mess(void)
 
 	if(xSemaphoreTake(xSemaphore_batt_volt_mutex_handle, 0))
 	{
-		batt_voltage = (2*ADC16_DRV_GetConvValueRAW(FSL_ADCONV1, 0)) * 0.000045777;
+		batt_voltage = (2*ADC16_DRV_GetConvValueRAW(FSL_ADCONV1, 0)) * 0.000045777; // Remember magic number
 		ADC16_DRV_PauseConv(FSL_ADCONV1,0);
 		xSemaphoreGive( xSemaphore_batt_volt_mutex_handle );
 	}
