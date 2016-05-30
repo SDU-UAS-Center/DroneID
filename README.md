@@ -1,5 +1,5 @@
 # DroneID
-This repository contains documentation of the DroneID project. DroneID is a research project conducted by the University of Southern Denmark in collaboration with the Danish Transport and Construction Agency in 2015.
+This repository contains documentation of the DroneID project. DroneID is a research project launched by the University of Southern Denmark in collaboration with the Danish Transport and Construction Agency in 2015.
 
 COPYRIGHT
 
