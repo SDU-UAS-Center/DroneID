@@ -45,8 +45,7 @@ typedef enum _button_push_type
 	NONE,
 	SINGLE,
 	DOUBLE,
-	LONG,
-	VERY_LONG
+	LONG
 }button_push_type;
 
 /***************************************************************************/
@@ -59,7 +58,6 @@ TaskHandle_t button_main_task_handle;
 xSemaphoreHandle xSemaphore_single_press;
 xSemaphoreHandle xSemaphore_double_press;
 xSemaphoreHandle xSemaphore_long_press;
-xSemaphoreHandle xSemaphore_very_long_press;
 
 /***************************************************************************/
 /* Shared functions */

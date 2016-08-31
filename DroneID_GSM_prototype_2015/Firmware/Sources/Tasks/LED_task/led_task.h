@@ -41,12 +41,12 @@
 // Shared types
 typedef enum _lp_state_indicator_types
 {
+	MODULE_IN_SLEEP_MODE,
 	MODULE_POWERED_OFF,
-	MODULE_ENTERING_UPDATE_MODE,
-	MODULE_ENTERING_POWER_OFF_MODE,
-	UPDATING_WITH_FIX,
-	UPDATING_WITHOUT_FIX,
-	MODULE_IN_SLEEP_MODE
+	MODULE_CONNECTING_GPRS,
+	MODULE_CONNECTING_GPS,
+	TRACKING_NO_FLIGHT_ZONE,
+	TRACKING_FLIGHT_ZONE
 }lp_state_indicator_types;
 
 /***************************************************************************/

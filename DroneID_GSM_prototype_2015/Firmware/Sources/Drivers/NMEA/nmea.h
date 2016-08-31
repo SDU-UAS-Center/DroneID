@@ -34,6 +34,7 @@
  # Modified: 2011-02-07 Kjeld Jensen, Released under MIT license
  # Modified: 2012-02-03 Kjeld Jensen, Modified to support the NMEAlog application
  # Modified: 2012-03-20 Kjeld Jensen, Added $GPGSV parsing
+ # Modified: 2016-03-08 Martin Skriver, Added distance converter dd.dddd to m
 ****************************************************************************/
 #ifndef NMEA_H_
 #define NMEA_H_
@@ -120,6 +121,7 @@ int nmea_gpgga_parse(char *nmeastr, gpgga_t *gga);
 int nmea_gpgsa_parse(char *nmeastr, gpgsa_t *gsa);
 int nmea_gpvtg_parse(char *nmeastr, gpvtg_t *vtg);
 int nmea_gpgsv_parse(char *nmeastr, gpgsv_t *gsv);
+double degree_to_meter_conv(gpgga_t *gga1, gpgga_t *gga2);
 
 /***************************************************************************/
 #endif /* NMEA_H_ */

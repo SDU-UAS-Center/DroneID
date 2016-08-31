@@ -95,6 +95,12 @@ bool enable_quick_send_mode(void);
 // Send msg to socket server
 bool send_msg_to_server(char **msg);
 
+// Send msg to socket server and check respond
+bool send_msg_receive_server_resond(char **msg);
+
+// Get signal quality report
+void get_sqr_report(char *rssi, char *ber);
+
 // Start publish NMEA to UART
 bool start_publish_nmea_to_uart(void);
 

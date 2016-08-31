@@ -53,7 +53,6 @@
 // Binary semaphores from license plate task to start/stop transmitting
 extern xSemaphoreHandle xSemaphore_pre_state;
 extern xSemaphoreHandle xSemaphore_next_state;
-extern xSemaphoreHandle xSemaphore_new_trial_state;
 
 // Protected queue to data send to GSM from gsm send
 extern QueueHandle_t xQueue_uart_gsm_send_handle;
@@ -74,17 +73,28 @@ extern xSemaphoreHandle xSemaphore_send_udp;
 // Binary semaphores to tap through DroneID states
 extern xSemaphoreHandle xSemaphore_get_new_voltage_sample;
 
+// GGA msg and mutex
+extern SemaphoreHandle_t xSemaphore_gga_msg_mutex_handle;
+extern gpgga_t gga_msg_global;
+
+// DroneID has moved binary
+extern xSemaphoreHandle xSemaphore_has_moved;
+
+// Protected variable for user selected DroneID mode
+extern droneid_mode_selector_type droneid_mode_selector;
+extern SemaphoreHandle_t xSemaphore_droneid_mode_selector;
+
 /***************************************************************************/
 /* Shared variables */
-// GGA msg and mutex
-SemaphoreHandle_t xSemaphore_gga_msg_mutex_handle;
-gpgga_t gga_msg_global;
 
 // Handle for other tasks to kill/it
 TaskHandle_t drone_id_task_handle;
 
 // Binary semaphore to reset gpgga data buffer
 xSemaphoreHandle xSemaphore_gpgga_reset;
+
+// If drone has moved then reset periodic send timer
+xSemaphoreHandle xSemaphore_send_timer_reset;
 
 /***************************************************************************/
 /* shared funtions */

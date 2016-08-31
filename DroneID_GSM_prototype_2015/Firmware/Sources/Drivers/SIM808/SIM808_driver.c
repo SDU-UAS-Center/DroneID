@@ -43,75 +43,95 @@
 
 /***************************************************************************/
 /* defines */
+// General server ok respond
+#define GENERAL_SERVER_OK_RESPOND			"ok"
+
 // General AT msgs
 #define AT_GENERAL_OK_RESPOND				"OK\r\n"
+#define AT_GENERAL_END_OF_MSG				"\r\n"
 
 // Defines for sync task
-#define AT_SYNC_COMMAND						"AT\n"
+#define AT_SYNC_COMMAND						"AT\r\n"
 #define SYNC_ITTERATIONS					200
 
 // Defines power up gps
-#define AT_GNSS_PWR_EN_COMMAND				"AT+CGNSPWR=1\n"
+#define AT_GNSS_PWR_EN_COMMAND				"AT+CGNSPWR=1\r\n"
 
 // Defines for gprs is attached
-#define AT_GPRS_STATUS_COMMAND				"AT+CGATT?\n"
+#define AT_GPRS_STATUS_COMMAND				"AT+CGATT?\r\n"
 #define AT_GPRS_STATUS_RESPOND				"+CGATT: 1\r\n"
-#define MAX_GPRS_ITTERATIONS				300
+#define MAX_GPRS_ITTERATIONS				150
 
 // Defines for setup cipmux
-#define AT_SINGLE_CONNECTION_COMMAND		"AT+CIPMUX=0\n"
+#define AT_SINGLE_CONNECTION_COMMAND		"AT+CIPMUX=0\r\n"
 
 // Defines for APN function
-#define AT_APN_USER_PASS_COMMAND			"AT+CSTT=\"internet\",\"\",\"\"\n"
+#define AT_APN_USER_PASS_COMMAND			"AT+CSTT=\"internet\",\"\",\"\"\r\n"
 
 // Defines til bring up wireless connection
-#define AT_BRING_UP_WIRELESS_COMMAND		"AT+CIICR\n"
+#define AT_BRING_UP_WIRELESS_COMMAND		"AT+CIICR\r\n"
 
 // Defines to get local ip address
-#define AT_GET_IP_COMMAND					"AT+CIFSR\n"
+#define AT_GET_IP_COMMAND					"AT+CIFSR\r\n"
 
 // Defines to connect to server
-#define AT_CONNECT_TO_SERVER_COMMAND		"AT+CIPSTART=\"UDP\",\"diam.uaslab.dk\",\"5050\"\n"
+#define AT_CONNECT_TO_SERVER_COMMAND		"AT+CIPSTART=\"UDP\",\"diam.uaslab.dk\",\"5050\"\r\n"
 #define AT_CONNECTED_OK_RESPOND				"CONNECT OK\r\n"
 
 // Defines to enable quick send
-#define AT_ENABLE_Q_SEND_COMMAND			"AT+CIPQSEND=1\n"
+#define AT_ENABLE_Q_SEND_COMMAND			"AT+CIPQSEND=1\r\n"
 
 // Defines to open a new msg
-#define AT_UDP_SEND_COMMAND					"AT+CIPSEND\n"
-#define AT_UDP_SEND_RESPOND					"> "
+#define AT_UDP_SEND_COMMAND					"AT+CIPSEND\r\n"
+#define AT_UDP_SEND_RESPOND					">"
 #define END_OF_MSG_COMMAND					" \x1A"
 #define AT_UDP_SEND_OK_RESPOND				"DATA ACCEPT:"
 
 // Defines to publish nmea to uart
-#define AT_SEND_NMEA_TO_UART_COMMAND		"AT+CGNSTST=1\n"
+#define AT_SEND_NMEA_TO_UART_COMMAND		"AT+CGNSTST=1\r\n"
 
 // Defines to close connection
-#define AT_CLOSE_CONNECTION_COMMAND			"AT+CIPCLOSE\n"
+#define AT_CLOSE_CONNECTION_COMMAND			"AT+CIPCLOSE\r\n"
 
 // Defines to reset ip sesion
-#define AT_RESET_IP_SESSION_COMMAND			"AT+CIPSHUT\n"
+#define AT_RESET_IP_SESSION_COMMAND			"AT+CIPSHUT\r\n"
 
 // Stop gps subscr
-#define AT_STOP_GPS_SUBSCR_COMMAND			"AT+CGNSTST=0\n"
+#define AT_STOP_GPS_SUBSCR_COMMAND			"AT+CGNSTST=0\r\n"
 
 // Power off gps
-#define AT_POWER_OFF_GPS_COMMAND			"AT+CGNSPWR=0\n"
+#define AT_POWER_OFF_GPS_COMMAND			"AT+CGNSPWR=0\r\n"
+
+// Quality signal report
+#define AT_QSR_REPORT_COMMAND				"AT+CSQ\r\n"
+#define AT_QSR_REPORT_RESPOND				"+CSQ:"
+#define MAX_SQR_LEN 						20
+
+#define AT_SET_SMS_MODE_COMMAND				"AT+CMGF=1\r"
+#define AT_SEND_TEXT_SMS_MODE_COMMAND		"AT+CMGS=?"
+#define SMS_SERVER_NUMBER					"+4526668267"
 
 /***************************************************************************/
 // Power on gsm modem
 void turn_on_modem_pwr_physical(void)
 {
-	GPIO_DRV_SetPinOutput(SIM808_PWRKEY);
 	GPIO_DRV_SetPinOutput(SIM808_RESET);
-	vTaskDelay(4000 / portTICK_RATE_MS);
+	GPIO_DRV_SetPinOutput(SIM808_PWRKEY);
+	vTaskDelay(1200 / portTICK_RATE_MS);
+	GPIO_DRV_ClearPinOutput(SIM808_PWRKEY);
+	vTaskDelay(2200 / portTICK_RATE_MS);
 }
 
 /***************************************************************************/
 // Power off gsm modem
 void turn_off_modem_pwr_physical(void)
 {
+	GPIO_DRV_SetPinOutput(SIM808_PWRKEY);
+	vTaskDelay(1200 / portTICK_RATE_MS);
 	GPIO_DRV_ClearPinOutput(SIM808_PWRKEY);
+	vTaskDelay(400 / portTICK_RATE_MS);
+
+//	GPIO_DRV_ClearPinOutput(SIM808_PWRKEY);
 	GPIO_DRV_ClearPinOutput(SIM808_RESET);
 }
 
@@ -173,7 +193,7 @@ bool check_gprs(void)
 	char send_command[sizeof(AT_GPRS_STATUS_COMMAND)] = AT_GPRS_STATUS_COMMAND;
 	char *pointer_array[3] = { AT_GPRS_STATUS_RESPOND, AT_GENERAL_OK_RESPOND };
 
-	uint8_t counter;
+	uint16_t counter;
 
 	for (counter = 0; ((!return_value) && (counter < MAX_GPRS_ITTERATIONS)); counter++)
 	{
@@ -248,6 +268,7 @@ bool close_udp_msg(void)
 	char *send_respond_ptr[2] = { AT_UDP_SEND_OK_RESPOND };
 	return send_gsm_command(END_OF_MSG_COMMAND, 100, 100, 10, send_respond_ptr, 500);
 }
+
 /***************************************************************************/
 // Send msg to socket server
 bool send_msg_to_server(char **msg)
@@ -258,11 +279,105 @@ bool send_msg_to_server(char **msg)
 	return_value = send_gsm_command(send_command, 100, 100, 20, pointer_array, 300);
 	vTaskDelay(20/portTICK_RATE_MS);
 
-	return_value |= add_array_of_strings_to_queue(msg, xQueue_uart_gsm_send_handle, 100, xSemaphore_uart_gsm_send_handle, 100);
+	return_value &= add_array_of_strings_to_queue(msg, xQueue_uart_gsm_send_handle, 100, xSemaphore_uart_gsm_send_handle, 100);
 	vTaskDelay(20/portTICK_RATE_MS);
-	return_value |= close_udp_msg();
+	return_value &= close_udp_msg();
 
 	return return_value;
+}
+
+/***************************************************************************/
+// Send msg to socket server and check respond
+bool send_msg_receive_server_resond(char **msg)
+{
+	bool return_value = false;
+	return_value = send_msg_to_server(msg);
+	vTaskDelay(50/portTICK_RATE_MS);
+	char *server_respond_array[2] = { GENERAL_SERVER_OK_RESPOND };
+	return_value &= queue_find_compare_match(server_respond_array, xQueue_receive_from_gsm_handle, 2000);
+
+	return return_value;
+}
+
+/***************************************************************************/
+// Check for two comma separated numbers
+bool sqr_report_check(char *buffer)
+{
+	bool accept_flag = false;
+	uint8_t i = 0;
+
+	// Number in array
+	while((!accept_flag) || (buffer[i] == '\0'))
+	{
+		if(!((buffer[i] > 0x30) && (buffer[i] < 0x3A)))
+		{
+			accept_flag = true;
+		}
+		i++;
+	}
+
+	// Comma in array
+	accept_flag = false;
+	while((!accept_flag) || (buffer[i] == '\0'))
+	{
+		if(buffer[i] == 0x2C)
+		{
+			accept_flag = true;
+		}
+		i++;
+	}
+
+	// Number in array
+	accept_flag = false;
+	while((!accept_flag) || (buffer[i] == '\0'))
+	{
+		if(!((buffer[i] > 0x30) && (buffer[i] < 0x3A)))
+		{
+			accept_flag = true;
+		}
+		i++;
+	}
+	return accept_flag;
+}
+
+/***************************************************************************/
+// Get signal quality report
+void get_sqr_report(char *rssi, char *ber)
+{
+	char receive_buffer[20];
+
+	clear_queue(xQueue_receive_from_gsm_handle, xSemaphore_receive_from_gsm_handle, 100);
+	add_string_to_queue(AT_QSR_REPORT_COMMAND, xQueue_uart_gsm_send_handle, 100, xSemaphore_uart_gsm_send_handle, 100);
+
+	uint8_t i=0;
+	uint8_t j=0;
+	uint8_t k=0;
+
+	if(return_string_with_identifier(xQueue_receive_from_gsm_handle, receive_buffer, AT_QSR_REPORT_RESPOND, AT_GENERAL_END_OF_MSG, MAX_SQR_LEN, 100))
+	{
+		if(sqr_report_check(receive_buffer))
+		{
+			while(!((receive_buffer[i] > 0x30) && (receive_buffer[i] < 0x3A)))
+			{
+				i++;
+			}
+			// Update rssi data
+			while(receive_buffer[i] != 0x2c)
+			{
+				rssi[j] = receive_buffer[i];
+				i++;
+				j++;
+			}
+			// Update ber data
+			i++;
+			while(receive_buffer[i] != '\r')
+			{
+				ber[k] = receive_buffer[i];
+				i++;
+				k++;
+			}
+		}
+	}
 }
 
 /***************************************************************************/
@@ -308,4 +423,21 @@ bool disable_gps_pwr(void)
 	char send_command[sizeof(AT_POWER_OFF_GPS_COMMAND)] = AT_POWER_OFF_GPS_COMMAND;
 	char *pointer_array[2] = { AT_GENERAL_OK_RESPOND };
 	return send_gsm_command(send_command, 100, 50, 500, pointer_array, 2000);
+}
+
+/***************************************************************************/
+// Send msg to sms server
+bool send_msg_to_sms_server(char **msg)
+{
+	bool return_value = false;
+	char send_command[sizeof(AT_UDP_SEND_COMMAND)] = AT_UDP_SEND_COMMAND;
+	char *pointer_array[2] = { AT_UDP_SEND_RESPOND };
+	return_value = send_gsm_command(send_command, 100, 100, 20, pointer_array, 300);
+	vTaskDelay(20/portTICK_RATE_MS);
+
+	return_value &= add_array_of_strings_to_queue(msg, xQueue_uart_gsm_send_handle, 100, xSemaphore_uart_gsm_send_handle, 100);
+	vTaskDelay(20/portTICK_RATE_MS);
+	return_value &= close_udp_msg();
+
+	return return_value;
 }

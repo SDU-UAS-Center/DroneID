@@ -289,7 +289,7 @@ bool return_string_with_identifier(QueueHandle_t * queue, char *return_buffer, c
 					}
 				}
 				// If size is bigger than max reset and start from beginning
-				if(max_lenght < data_counter)
+				if(max_lenght <= data_counter)
 				{
 					data_counter = 0;
 					start_accepted = false;

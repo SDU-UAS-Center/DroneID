@@ -63,7 +63,9 @@ void create_binary_semaphores(void)
 	// Create semaphores to tap through DroneID states
 	vSemaphoreCreateBinary(xSemaphore_next_state);
 	vSemaphoreCreateBinary(xSemaphore_pre_state);
-	vSemaphoreCreateBinary(xSemaphore_new_trial_state);
+
+	// Mutex to protect variable for DroneID mode
+	xSemaphore_droneid_mode_selector = xSemaphoreCreateMutex();
 }
 
 /***************************************************************************/
@@ -71,9 +73,9 @@ void create_binary_semaphores(void)
 void wait_for_created_dependencies(void)
 {
 	while(!((xSemaphore_single_press != NULL) && (xSemaphore_double_press != NULL)
-			&& (xSemaphore_long_press != NULL) && (xSemaphore_very_long_press != NULL)))
+			&& (xSemaphore_long_press != NULL)))
 	{
-		vTaskDelay(200/portTICK_RATE_MS);
+		vTaskDelay(1000/portTICK_RATE_MS);
 	}
 }
 
@@ -110,32 +112,47 @@ void enter_sleep_mode(void)
 /* Enter read input function and stay forever */
 void enter_read_user_input(void)
 {
+	xSemaphoreTake(xSemaphore_next_state, SEMAPHORE_BLOCK_TIME_0);
+	xSemaphoreTake(xSemaphore_pre_state, SEMAPHORE_BLOCK_TIME_0);
+	xSemaphoreTake(xSemaphore_long_press, SEMAPHORE_BLOCK_TIME_0);
+
 	while(true)
 	{
-		if(xSemaphoreTake(xSemaphore_long_press, SEMAPHORE_BLOCK_TIME_0))
+		if(xSemaphoreTake(xSemaphore_single_press, SEMAPHORE_BLOCK_TIME_0))
 		{
-			// Give semaphore and just in case take back old semaphores
-			xSemaphoreTake(xSemaphore_new_trial_state, SEMAPHORE_BLOCK_TIME_0);
-			xSemaphoreTake(xSemaphore_next_state, SEMAPHORE_BLOCK_TIME_0);
-			xSemaphoreGive(xSemaphore_pre_state);
-		}
-		else if(xSemaphoreTake(xSemaphore_double_press, SEMAPHORE_BLOCK_TIME_0))
-		{
-			// Give semaphore and just in case take back old semaphores
-			xSemaphoreTake(xSemaphore_new_trial_state, SEMAPHORE_BLOCK_TIME_0);
+			// Stop DroneID
+			if(xSemaphoreTake(xSemaphore_droneid_mode_selector, 1000))
+			{
+				droneid_mode_selector = POWER_ON;
+				xSemaphoreGive(xSemaphore_droneid_mode_selector);
+			}
+
 			xSemaphoreTake(xSemaphore_pre_state, SEMAPHORE_BLOCK_TIME_0);
 			xSemaphoreGive(xSemaphore_next_state);
 		}
-		else if(xSemaphoreTake(xSemaphore_single_press, SEMAPHORE_BLOCK_TIME_0))
+		else if(xSemaphoreTake(xSemaphore_double_press, SEMAPHORE_BLOCK_TIME_0))
 		{
+			// Stop DroneID
+			if(xSemaphoreTake(xSemaphore_droneid_mode_selector, 1000))
+			{
+				droneid_mode_selector = POWER_OFF;
+				xSemaphoreGive(xSemaphore_droneid_mode_selector);
+			}
+
+			// Give semaphore and just in case take back old semaphores
 			xSemaphoreTake(xSemaphore_next_state, SEMAPHORE_BLOCK_TIME_0);
-			xSemaphoreTake(xSemaphore_pre_state, SEMAPHORE_BLOCK_TIME_0);
-			xSemaphoreGive(xSemaphore_new_trial_state);
+			xSemaphoreGive(xSemaphore_pre_state);
 		}
-		else if(xSemaphoreTake(xSemaphore_very_long_press, SEMAPHORE_BLOCK_TIME_0))
+		else if(xSemaphoreTake(xSemaphore_long_press, SEMAPHORE_BLOCK_TIME_0))
 		{
-			// Try to send stop msg before shut dowm
-			xSemaphoreTake(xSemaphore_new_trial_state, SEMAPHORE_BLOCK_TIME_0);
+			// Stop DroneID
+			if(xSemaphoreTake(xSemaphore_droneid_mode_selector, 1000))
+			{
+				droneid_mode_selector = POWER_OFF;
+				xSemaphoreGive(xSemaphore_droneid_mode_selector);
+			}
+
+			// Try send stop msg before shut dowm
 			xSemaphoreTake(xSemaphore_next_state, SEMAPHORE_BLOCK_TIME_0);
 			xSemaphoreGive(xSemaphore_pre_state);
 
@@ -152,6 +169,13 @@ void enter_read_user_input(void)
 void user_input_main_task(void *arg)
 {
 	create_binary_semaphores();
+
+	if(xSemaphoreTake(xSemaphore_droneid_mode_selector, 1000))
+	{
+		droneid_mode_selector = POWER_OFF;
+		xSemaphoreGive(xSemaphore_droneid_mode_selector);
+	}
+
 	wait_for_created_dependencies();
 	vTaskDelay(1000/portTICK_RATE_MS);
 	enter_read_user_input();

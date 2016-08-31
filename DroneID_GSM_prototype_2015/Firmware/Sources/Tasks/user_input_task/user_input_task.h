@@ -43,6 +43,15 @@
 #include "Tasks/LED_task/led_task.h"
 
 /***************************************************************************/
+/* Global types */
+// Button push type
+typedef enum _droneid_mode_selector_type
+{
+	POWER_OFF,
+	POWER_ON
+}droneid_mode_selector_type;
+
+/***************************************************************************/
 /* Include external variables */
 // Handles to kill license plate tasks before go to sleep
 extern TaskHandle_t drone_id_task_handle;
@@ -59,7 +68,6 @@ extern TaskHandle_t tracking_timer_handle;
 extern xSemaphoreHandle xSemaphore_single_press;
 extern xSemaphoreHandle xSemaphore_double_press;
 extern xSemaphoreHandle xSemaphore_long_press;
-extern xSemaphoreHandle xSemaphore_very_long_press;
 
 // Protected variable for the red led indicator
 extern lp_state_indicator_types lp_state_red_indicator;
@@ -70,7 +78,10 @@ extern SemaphoreHandle_t xSemaphore_lp_state_indicator;
 // Create binary semaphores to tap through DroneID states
 xSemaphoreHandle xSemaphore_pre_state;
 xSemaphoreHandle xSemaphore_next_state;
-xSemaphoreHandle xSemaphore_new_trial_state;
+
+// Protected variable for user selected DroneID mode
+droneid_mode_selector_type droneid_mode_selector;
+SemaphoreHandle_t xSemaphore_droneid_mode_selector;
 
 /***************************************************************************/
 /* Shared functions */

@@ -38,6 +38,11 @@
 #define TRACKING_TIMER_TASK_H_
 
 /***************************************************************************/
+/* External variables */
+// If drone has moved then reset periodic send timer
+extern xSemaphoreHandle xSemaphore_send_timer_reset;
+
+/***************************************************************************/
 /* Shared variables */
 // Task handle
 TaskHandle_t tracking_timer_handle;

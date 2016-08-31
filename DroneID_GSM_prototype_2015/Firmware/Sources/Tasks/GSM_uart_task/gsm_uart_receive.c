@@ -72,25 +72,45 @@ void gsm_uart_receive_task(void *arg)
 	while(true)
 	{
 		buffer_counter = 0;
-
+		uart_receive_char = '\0';
 		if(xQueueReceive( xQueue_uart_gsm_receive_handle, &uart_receive_char, ( TickType_t ) LONG_TIME ))
 		{
 			uart_receive_buffer[buffer_counter] = uart_receive_char;
 			buffer_counter++;
-			uart_receive_buffer[buffer_counter] = NULL;
 
-			// Empty receive buffer
-			while(xQueueReceive( xQueue_uart_gsm_receive_handle, &uart_receive_char, ( TickType_t ) 0 ))
+			// NMEA
+			if(uart_receive_char == '$')
 			{
-				uart_receive_buffer[buffer_counter] = uart_receive_char;
-				buffer_counter++;
-				uart_receive_buffer[buffer_counter] = NULL;
+				while((uart_receive_char != '\n') && (buffer_counter < 120))
+				{
+					if(xQueueReceive( xQueue_uart_gsm_receive_handle, &uart_receive_char, ( TickType_t ) LONG_TIME ))
+					{
+						uart_receive_buffer[buffer_counter] = uart_receive_char;
+						buffer_counter++;
+					}
+				}
+				uart_receive_buffer[buffer_counter] = '\0'; //NULL;
+				add_string_to_queue(uart_receive_buffer, xQueue_uart_nmea_receive_handle, 0, xSemaphore_uart_nmea_receive_handle, 50);
+//				add_string_to_queue(uart_receive_buffer, xQueue_virtual_com_send_handle, 0, xSemaphore_virtual_com_send_handle, 50);
 			}
-			add_string_to_queue(uart_receive_buffer, xQueue_receive_from_gsm_handle, 0, xSemaphore_receive_from_gsm_handle, 50);
-			add_string_to_queue(uart_receive_buffer, xQueue_uart_nmea_receive_handle, 0, xSemaphore_uart_nmea_receive_handle, 50);
-//			add_string_to_queue(uart_receive_buffer, xQueue_virtual_com_send_handle, 0, xSemaphore_virtual_com_send_handle, 50);
+			// GSM msg
+			else
+			{
+				while((uart_receive_char != '\n') && (buffer_counter < 120) && (uart_receive_char != '>'))
+				{
+					if(xQueueReceive( xQueue_uart_gsm_receive_handle, &uart_receive_char, ( TickType_t ) LONG_TIME ))
+					{
+						uart_receive_buffer[buffer_counter] = uart_receive_char;
+						buffer_counter++;
+					}
+				}
+				uart_receive_buffer[buffer_counter] = '\0';
+				add_string_to_queue(uart_receive_buffer, xQueue_receive_from_gsm_handle, 0, xSemaphore_receive_from_gsm_handle, 50);
+//				add_string_to_queue(uart_receive_buffer, xQueue_virtual_com_send_handle, 0, xSemaphore_virtual_com_send_handle, 50);
+			}
 		}
 		vTaskDelay(5/portTICK_RATE_MS);
 	}
 }
+
 

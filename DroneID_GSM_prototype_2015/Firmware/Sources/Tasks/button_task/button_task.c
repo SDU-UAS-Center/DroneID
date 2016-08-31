@@ -45,8 +45,7 @@
 
 /***************************************************************************/
 /* #defines */
-#define LONG_PRESS_MS				1500
-#define VERY_LONG_PRESS_MS			4500
+#define LONG_PRESS_MS				2000
 #define MAX_DELAY_BETWEEN_PUSH		500
 #define JITTER_FILTER_MS			30
 #define MS_LOOP_DELAY				10
@@ -100,12 +99,6 @@ button_push_type get_push_type(uint32_t button)
 			{
 				if(filter_buffer >= JITTER_FILTER_MS)
 				{
-					// If pressed more than defined for long press
-					if(button_timer >= LONG_PRESS_MS)
-					{
-						return LONG;
-					}
-
 					button_timer = 0;
 					filter_buffer = 0;
 					button_states = DOUBLE_STATE;
@@ -115,9 +108,9 @@ button_push_type get_push_type(uint32_t button)
 			else
 			{
 				filter_buffer = 0;
-				if(button_timer >= VERY_LONG_PRESS_MS )
+				if(button_timer >= LONG_PRESS_MS )
 				{
-					return VERY_LONG;
+					return LONG;
 				}
 			}
 			break;
@@ -151,13 +144,11 @@ void create_binary_button_task_semaphores(void)
 	vSemaphoreCreateBinary(xSemaphore_single_press);
 	vSemaphoreCreateBinary(xSemaphore_double_press);
 	vSemaphoreCreateBinary(xSemaphore_long_press);
-	vSemaphoreCreateBinary(xSemaphore_very_long_press);
 
 	// Take semaphores just in case
 	xSemaphoreTake(xSemaphore_single_press, 0);
 	xSemaphoreTake(xSemaphore_double_press, 0);
 	xSemaphoreTake(xSemaphore_long_press, 0);
-	xSemaphoreTake(xSemaphore_very_long_press, 0);
 }
 
 /***************************************************************************/
@@ -186,10 +177,6 @@ void read_button(void)
 				xSemaphoreGive(xSemaphore_long_press);
 				vTaskDelay(MS_MIN_TO_NX_PUSH_SEQ/portTICK_RATE_MS);
 				break;
-			case VERY_LONG:
-				xSemaphoreGive(xSemaphore_very_long_press);
-				vTaskDelay(MS_MIN_TO_NX_PUSH_SEQ/portTICK_RATE_MS);
-				break;
 			}
 			// Ensure button is released before exit
 			while(!GPIO_DRV_ReadPinInput(PUSH_BTN))
@@ -209,15 +196,3 @@ void button_main_task(void *param)
 	create_binary_button_task_semaphores();
 	read_button();
 }
-
-
-
-
-
-
-
-
-
-
-
-

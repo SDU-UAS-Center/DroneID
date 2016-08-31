@@ -46,8 +46,9 @@
 /***************************************************************************/
 /* Include external variables */
 // GGA msg and mutex
-extern SemaphoreHandle_t xSemaphore_gga_msg_mutex_handle;
-extern gpgga_t gga_msg_global;
+SemaphoreHandle_t xSemaphore_gga_msg_mutex_handle;
+gpgga_t gga_msg_global;
+gpgga_t gga_msg_ref;
 
 // Binary semaphore to reset gpgga data buffer
 extern xSemaphoreHandle xSemaphore_gpgga_reset;
@@ -62,6 +63,11 @@ SemaphoreHandle_t xSemaphore_uart_nmea_receive_handle;
 
 // Binary semaphore indicate if gps subscriber is inactive
 xSemaphoreHandle xSemaphore_gps_subscr_deacted;
+xSemaphoreHandle xSemaphore_gps_subscr_recon;
+
+// DroneID has moved binary
+xSemaphoreHandle xSemaphore_has_moved;
+
 
 /***************************************************************************/
 /* shared functions */

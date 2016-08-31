@@ -36,11 +36,13 @@
  # Modified: 2012-03-20 Kjeld Jensen, Added $GPGSV parsing
  # Modified: 2012-05-24 Kjeld Jensen, added check for SNR 0xFF in $GPGSV parsing
  # Modified: 2013-05-02 Kjeld Jensen, Parser is now tolerant for problem with RTKlib $GPGSV messages
+ # Modified: 2016-03-08 Martin Skriver, Added distance converter dd.dddd to m
  ****************************************************************************/
 /* system includes */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 /***************************************************************************/
 /* application includes */
@@ -78,6 +80,9 @@
 #define GPGSA_PDOP			15
 #define GPGSA_HDOP			16
 #define GPGSA_VDOP			17
+
+#define PI					3.14159
+#define EARTH_RADIUS_M		6371000
 
 /***************************************************************************/
 /* function prototypes */
@@ -382,5 +387,20 @@ int nmea_checksum (char *s)
 	}
 
 	return (result);
+}
+/***************************************************************************/
+double degree_to_meter_conv(gpgga_t *gga1, gpgga_t *gga2)
+{
+	double lat1 = (gga1->lat*PI)/180;
+	double lat2 = (gga2->lat*PI)/180;
+	double delta_lat = ((gga2->lat-gga1->lat)*PI)/(double)180;
+	double delta_lon = ((gga2->lon-gga1->lon)*PI)/(double)180;
+
+	double a = sin(delta_lat/2) * sin(delta_lat/2) + sin(delta_lon/2) * sin(delta_lon/2) * cos(lat1) * cos(lat2);
+	double c = 2 * atan2(sqrt(a), sqrt(1-a));
+
+	return EARTH_RADIUS_M * c;
+
+//	return 3.9;
 }
 /***************************************************************************/

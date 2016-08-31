@@ -46,24 +46,57 @@
 /***************************************************************************/
 /* #defines */
 // Define pwm duty for leds
-#define GREEN_LED_CHARGING_DUTY		700
-#define GREEN_LED_BATTERY_DUTY		100
-#define RED_LED_CHARGING_DUTY		700
-#define RED_LED_BATTERY_DUTY		100
+#define LED_DUTY					100
+#define LED_OFF_duty				0
 
-#define MS_DELAY					10
-#define MS_PULSE_LED_ON				200
-#define MS_PULSE_LED_OFF			200
-#define MS_PULSE_PAUSE				1000
+#define DELAY_10_MS					10
+#define DELAY_300_MS				300
+
+#define PULSE_PAUSE_LED_ON_MS		200
+#define PULSE_PAUSE_LED_OFF_MS		200
+#define PULSE_PAUSE_DUTY_MS			1000
+#define ONE_PULSE					1
+#define TWO_PULSES					2
+#define THREE_PULSES				3
+
+
+#define FLASH_MODE_ON_MS			10
+#define FLASH_MODE_OFF_MS			90
+
+/***************************************************************************/
+// Flashing return value according on and off time
+bool flash_mode(uint32_t on_ms, uint32_t off_ms)
+{
+	static bool led_on = false;
+	static uint32_t ms_count = 0;
+
+	if(led_on)
+	{
+		if( ms_count >= on_ms)
+		{
+			ms_count = 0;
+			led_on = false;
+		}
+	}
+	else
+	{
+		if( ms_count >= off_ms)
+		{
+			ms_count = 0;
+			led_on = true;
+		}
+	}
+	ms_count += DELAY_10_MS;
+	return led_on;
+}
 
 /***************************************************************************/
 // Make pulse/pause with argument of no. of pulses
-bool pulse_mode_get_led_state(uint8_t no_of_pulses)
+bool pulse_puse_mode(uint8_t no_of_pulses)
 {
 	static uint8_t pulse_no = 0;
 	static bool led_on = false;
 	static uint32_t ms_count = 0;
-	//
 
 	// Check if pause time or pulse time
 	if(no_of_pulses >= pulse_no)
@@ -71,7 +104,7 @@ bool pulse_mode_get_led_state(uint8_t no_of_pulses)
 		// Check if pulse high or low
 		if(led_on)
 		{
-			if(ms_count >= MS_PULSE_LED_ON)
+			if(ms_count >= PULSE_PAUSE_LED_ON_MS)
 			{
 				ms_count = 0;
 				led_on = false;
@@ -80,7 +113,7 @@ bool pulse_mode_get_led_state(uint8_t no_of_pulses)
 		}
 		else
 		{
-			if(ms_count >= MS_PULSE_LED_OFF)
+			if(ms_count >= PULSE_PAUSE_LED_OFF_MS)
 			{
 				ms_count = 0;
 				led_on = true;
@@ -90,7 +123,7 @@ bool pulse_mode_get_led_state(uint8_t no_of_pulses)
 	// Pause time
 	else
 	{
-		if( ms_count >= MS_PULSE_PAUSE)
+		if( ms_count >= PULSE_PAUSE_DUTY_MS)
 		{
 			ms_count = 0;
 			pulse_no = 1;
@@ -98,108 +131,72 @@ bool pulse_mode_get_led_state(uint8_t no_of_pulses)
 		}
 	}
 
-	ms_count += MS_DELAY;
+	ms_count += DELAY_10_MS;
 	return led_on;
 }
 
 /***************************************************************************/
-// Gives a sinus function to the intensity of light
-uint32_t module_powered_on_sin(uint32_t charging_state, uint8_t speed)
+// Read status of DroneID and set LED state indicator
+void update_DroneID_led()
 {
-	static uint32_t duty_buffer = 0;
-	if(duty_buffer >= 359)
+	// Get charging indication
+	// GPIO_DRV_ReadPinInput(LTC4065_CHRG)
+	if(xSemaphoreTake(xSemaphore_lp_state_indicator, 0))
+	{
+		switch (lp_state_red_indicator)
 		{
-			duty_buffer = 0;
+		case MODULE_IN_SLEEP_MODE:
+			TPM1_C0V = LED_OFF_duty;
+			TPM1_C1V = LED_OFF_duty;
+			break;
+
+		case MODULE_POWERED_OFF:
+			TPM1_C0V = LED_DUTY * pulse_puse_mode(ONE_PULSE);
+			TPM1_C1V = LED_OFF_duty;
+			break;
+
+		case MODULE_CONNECTING_GPRS:
+			TPM1_C0V = LED_DUTY * pulse_puse_mode(TWO_PULSES);
+			TPM1_C1V = LED_OFF_duty;
+			break;
+
+		case MODULE_CONNECTING_GPS:
+			TPM1_C0V = LED_DUTY * pulse_puse_mode(THREE_PULSES);
+			TPM1_C1V = LED_OFF_duty;
+			break;
+
+		case TRACKING_NO_FLIGHT_ZONE:
+			TPM1_C0V = LED_DUTY * flash_mode(FLASH_MODE_ON_MS, FLASH_MODE_OFF_MS);
+			TPM1_C1V = LED_OFF_duty;
+			break;
+
+		case TRACKING_FLIGHT_ZONE:
+			TPM1_C0V = LED_OFF_duty;
+			TPM1_C1V = LED_DUTY * flash_mode(FLASH_MODE_ON_MS, FLASH_MODE_OFF_MS);
+			break;
 		}
-	else
-		{
-			duty_buffer += speed;
-		}
-	if(charging_state)
-	{
-		return (RED_LED_BATTERY_DUTY/2)*(1+sin(duty_buffer/57.295f));
-	}
-	else
-	{
-		return (RED_LED_CHARGING_DUTY/2)*(1+sin(duty_buffer/57.295f));
+		xSemaphoreGive( xSemaphore_lp_state_indicator);
 	}
 }
 
 /***************************************************************************/
-// Indicate with the led in which state the DroneID is in
-uint16_t get_red_signal(uint32_t charging_state)
-{
-	bool led_indicator = false;
-
-	switch (lp_state_red_indicator)
-	{
-		// Set mcu io to power on gsm modem
-	case MODULE_IN_SLEEP_MODE:
-		led_indicator = 0;
-		break;
-
-	case MODULE_POWERED_OFF:
-		led_indicator = pulse_mode_get_led_state(1);
-		break;
-
-	case MODULE_ENTERING_UPDATE_MODE:
-		led_indicator = pulse_mode_get_led_state(2);
-		break;
-
-	case MODULE_ENTERING_POWER_OFF_MODE:
-		led_indicator = pulse_mode_get_led_state(3);
-		break;
-
-	case UPDATING_WITH_FIX:
-		return module_powered_on_sin(charging_state, 5);
-		break;
-
-	case UPDATING_WITHOUT_FIX:
-		return module_powered_on_sin(charging_state, 1);
-		break;
-	}
-
-	if(charging_state)
-	{
-		return led_indicator*RED_LED_BATTERY_DUTY;
-	}
-	else
-	{
-		return led_indicator*RED_LED_CHARGING_DUTY;
-	}
-	return pulse_mode_get_led_state(5)*RED_LED_CHARGING_DUTY;
-}
-
-/***************************************************************************/
-// Connect green led to gsm netlight pin
-uint16_t get_green_signal(uint32_t charging_state)
-{
-	if(charging_state)
-	{
-		return GPIO_DRV_ReadPinInput(SIM808_NETLIGHT)*GREEN_LED_BATTERY_DUTY;
-	}
-	else
-	{
-		return GPIO_DRV_ReadPinInput(SIM808_NETLIGHT)*GREEN_LED_CHARGING_DUTY;
-	}
-}
-
-/***************************************************************************/
+// Main task for controlling the two LEDs on the DroneID
 void led_main_task(void *param)
 {
+	// Create mutex and instantiate LED status
 	xSemaphore_lp_state_indicator = xSemaphoreCreateMutex();
+	vTaskDelay(DELAY_300_MS/portTICK_RATE_MS);
 	if(xSemaphoreTake(xSemaphore_lp_state_indicator, 0))
 	{
 		lp_state_red_indicator = MODULE_POWERED_OFF;
-		xSemaphoreGive( xSemaphore_lp_state_indicator );
+		xSemaphoreGive( xSemaphore_lp_state_indicator);
 	}
 
+	// Enter while loop forever
 	while(true)
 	{
-		TPM1_C0V = get_red_signal(GPIO_DRV_ReadPinInput(LTC4065_CHRG));
-		TPM1_C1V = get_green_signal(GPIO_DRV_ReadPinInput(LTC4065_CHRG));
-
-		vTaskDelay(MS_DELAY/portTICK_RATE_MS); /* wait for 250 ms */
+		update_DroneID_led();
+		vTaskDelay(DELAY_10_MS/portTICK_RATE_MS);
 	}
 }
 

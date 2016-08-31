@@ -82,7 +82,7 @@ int main(void)
 		"GPS_TASK", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		&GPS_task_handle); /* task handle */
 	configASSERT( GPS_task_handle );
 
@@ -91,7 +91,7 @@ int main(void)
 		"DRONE_ID_TASK", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		&drone_id_task_handle); /* task handle */
 	configASSERT( drone_id_task_handle );
 
@@ -100,7 +100,7 @@ int main(void)
 		"USER_INPUT_TASK", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		NULL); /* task handle */
 
 	xTaskCreate(
@@ -108,7 +108,7 @@ int main(void)
 		"VC_TASK", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		&vc_task_handle); /* task handle */
 	configASSERT( vc_task_handle );
 
@@ -117,7 +117,7 @@ int main(void)
 		"GSM_UART_SEND", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		&gsm_uart_send_task_handle); /* task handle */
 	configASSERT( gsm_uart_send_task_handle );
 
@@ -126,7 +126,7 @@ int main(void)
 		"GSM_UART_RECEIVE", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		&gsm_uart_receive_task_handle); /* task handle */
 	configASSERT( gsm_uart_receive_task_handle );
 
@@ -135,7 +135,7 @@ int main(void)
 		"LED_TASK", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		NULL); /* task handle */
 
 	xTaskCreate(
@@ -143,7 +143,7 @@ int main(void)
 		"BUTTON_TASK", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		&button_main_task_handle); /* task handle */
 	configASSERT( button_main_task_handle );
 
@@ -161,7 +161,7 @@ int main(void)
 		"TRACKING_TIMER", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		&tracking_timer_handle); /* task handle */
 	configASSERT( tracking_timer_handle );
 
@@ -170,7 +170,7 @@ int main(void)
 		"IMU_TASK", /* task name for kernel awareness */
 		configMINIMAL_STACK_SIZE, /* task stack size */
 		(void*)NULL, /* optional task startup argument */
-		tskIDLE_PRIORITY,  /* initial priority */
+		tskIDLE_PRIORITY+10,  /* initial priority */
 		&imu_main_task_handle); /* task handle */
 	configASSERT( imu_main_task_handle );
 

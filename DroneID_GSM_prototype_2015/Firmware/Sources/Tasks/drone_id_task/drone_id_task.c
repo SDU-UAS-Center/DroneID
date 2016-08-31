@@ -52,8 +52,11 @@
 /***************************************************************************/
 /* #defines */
 // ID number
-#define DRONE_ID					"42"
+#define DRONE_ID					"4"
+#define FIRMWARE_VERSION			"1.0"
+#define HW_VERSION					"1.0"
 // Defines to pkg type
+#define FIRMWARE_VERSION_TYPE		"0"
 #define RESET_PKG_TYPE				"1"
 #define START_TRACKING_PKG_TYPE		"2"
 #define UPDATE_WITH_FIX_PKG_TYPE	"3"
@@ -67,6 +70,7 @@
 #define EMPTY_POSITION_CHAR			"\0"
 
 #define MSG_FAILED_TO_SEND			"Error sending tracking msg"
+#define RECONNECTED_GNSS			"RECONNECTING GNSS"
 
 // Define msgs to include in pkg to server
 #define INCLUDE_TIME				1
@@ -82,6 +86,8 @@
 #define INCLUDE_TEMP				1
 #define INCLUDE_PRESSURE			1
 #define INCLUDE_BATT_V				1
+#define INCLUDE_RSSI				1
+#define INCLUDE_BER					1
 
 // Defines to tracking state machine
 #define UPDATE_POS					1
@@ -101,6 +107,7 @@ enum tracking_states
 	INIT_GPRS_STATE,
 	INIT_GPS_STATE,
 	START_TRACKING_STATE,
+	SEND_VERSION_STATE,
 	TRACKING_STATE
 };
 
@@ -132,7 +139,16 @@ double get_protected_double(SemaphoreHandle_t semaphore, uint16_t max_delay, dou
 /* Create and send an update pkg */
 bool create_and_pub_drone_pos(void)
 {
-	char *gps_pos_msg[30];
+	char rssi[3] = {'0','\0','\0'};
+	char ber[3] = {'0','\0','\0'};
+
+	if(INCLUDE_RSSI || INCLUDE_BER)
+	{
+		get_sqr_report(rssi, ber);
+		// todo update rssi and ber
+	}
+
+	char *gps_pos_msg[40];
 	char lat_array[11];
 	char lon_array[11];
 	char fix_array[3];
@@ -158,7 +174,7 @@ bool create_and_pub_drone_pos(void)
 		if(gga_msg_global.fix == '\0')
 		{
 			// Change indicator state
-			change_led_indicator_state(UPDATING_WITHOUT_FIX);
+			change_led_indicator_state(TRACKING_NO_FLIGHT_ZONE);
 			gps_pos_msg[msg_pos] = UPDATE_WITHOUT_FIX_PKG_TYPE;
 			msg_pos++;
 			gps_pos_msg[msg_pos] = SEPERATOR;
@@ -167,7 +183,7 @@ bool create_and_pub_drone_pos(void)
 		else
 		{
 			// Change indicator state
-			change_led_indicator_state(UPDATING_WITH_FIX);
+			change_led_indicator_state(TRACKING_FLIGHT_ZONE);
 			gps_pos_msg[msg_pos] = UPDATE_WITH_FIX_PKG_TYPE;
 			msg_pos++;
 			gps_pos_msg[msg_pos] = SEPERATOR;
@@ -284,6 +300,23 @@ bool create_and_pub_drone_pos(void)
 			gps_pos_msg[msg_pos] = SEPERATOR;
 			msg_pos++;
 		}
+
+		if(INCLUDE_RSSI)
+		{
+			gps_pos_msg[msg_pos] = rssi;
+			msg_pos++;
+			gps_pos_msg[msg_pos] = SEPERATOR;
+			msg_pos++;
+		}
+
+		if(INCLUDE_BER)
+		{
+			gps_pos_msg[msg_pos] = ber;
+			msg_pos++;
+			gps_pos_msg[msg_pos] = SEPERATOR;
+			msg_pos++;
+		}
+
 		gps_pos_msg[msg_pos] = EMPTY_POSITION_CHAR;
 		// Send data and give back mutex
 		return_value = send_msg_to_server(gps_pos_msg);
@@ -313,13 +346,16 @@ bool init_gprs(void)
 
 	turn_on_modem_pwr_physical();
 	// Maybe this is not needed here
-	// reset_gsm_modem();
+//	reset_gsm_modem();
 
 	// Sync baud and check modem connection
 	succes &= send_gsm_sync_msg();
 
 	// Check if GPRS is connected
-	succes &= check_gprs();
+	if(succes)
+	{
+		succes &= check_gprs();
+	}
 
 	// If no GPRS, don't try the rest
 	if(succes)
@@ -381,7 +417,6 @@ void remove_old_semaphore_commands(void)
 {
 	xSemaphoreTake(xSemaphore_pre_state, 0);
 	xSemaphoreTake(xSemaphore_next_state, 0);
-	xSemaphoreTake(xSemaphore_new_trial_state, 0);
 }
 
 /***************************************************************************/
@@ -405,6 +440,14 @@ void send_debug_msg(char *error_msg)
 }
 
 /***************************************************************************/
+/* Send msg to server and receive confirmation from server */
+bool send_firmware_version()
+{
+	char *msg[8] = {DRONE_ID, SEPERATOR, FIRMWARE_VERSION_TYPE, SEPERATOR, HW_VERSION, SEPERATOR, FIRMWARE_VERSION, "\0"};
+	return send_msg_receive_server_resond(msg);
+}
+
+/***************************************************************************/
 /*  */
 void gprs_tracking_state_machine(uint8_t update_mode)
 {
@@ -414,7 +457,7 @@ void gprs_tracking_state_machine(uint8_t update_mode)
 	switch (cur_tracking_state)
 	{
 	case INIT_GPRS_STATE:
-		change_led_indicator_state(MODULE_ENTERING_UPDATE_MODE);
+		change_led_indicator_state(MODULE_CONNECTING_GPRS);
 		turn_off_modem_pwr_physical();
 		vTaskDelay(500/portTICK_RATE_MS);
 
@@ -430,9 +473,15 @@ void gprs_tracking_state_machine(uint8_t update_mode)
 		break;
 
 	case INIT_GPS_STATE:
+		change_led_indicator_state(MODULE_CONNECTING_GPS);
 		if(init_gps())
 		{
-			cur_tracking_state = START_TRACKING_STATE;
+			// Use when sending nmea to usb only
+//			while(true)
+//			{
+//				vTaskDelay(20000/portTICK_RATE_MS);
+//			}
+			cur_tracking_state = SEND_VERSION_STATE;
 			// Delete old data from gpgga buffer
 			xSemaphoreGive(xSemaphore_gpgga_reset);
 		}
@@ -441,6 +490,26 @@ void gprs_tracking_state_machine(uint8_t update_mode)
 			reset_gsm_modem();
 			cur_tracking_state = INIT_GPRS_STATE;
 		}
+		break;
+
+	case SEND_VERSION_STATE:
+		if(send_firmware_version())
+		{
+			cur_tracking_state = START_TRACKING_STATE;
+			error_counter = 0;
+		}
+		else
+		{
+			close_udp_msg();
+			error_counter++;
+			if(error_counter > 3)
+			{
+				reset_gsm_modem();
+				cur_tracking_state = INIT_GPRS_STATE;
+			}
+		}
+		break;
+
 	case START_TRACKING_STATE:
 		if(send_start_stop_tracking(START_TRACKING_PKG_TYPE))
 		{
@@ -457,16 +526,10 @@ void gprs_tracking_state_machine(uint8_t update_mode)
 				cur_tracking_state = INIT_GPRS_STATE;
 			}
 		}
+		break;
 
 	case TRACKING_STATE:
-		// Check if user stopped tracking
-		if(update_mode == STOP_UPDATING_POS)
-		{
-			send_start_stop_tracking(STOP_TRACKING_PKG_TYPE);
-			vTaskDelay(200/portTICK_RATE_MS);
-			cur_tracking_state = INIT_GPRS_STATE;
-		}
-		else if(update_mode == NEW_TRIAL)
+		if(xSemaphoreTake(xSemaphore_next_state, 0))
 		{
 			send_start_stop_tracking(STOP_TRACKING_PKG_TYPE);
 			vTaskDelay(100/portTICK_RATE_MS);
@@ -479,11 +542,22 @@ void gprs_tracking_state_machine(uint8_t update_mode)
 			reset_gsm_modem();
 			cur_tracking_state = INIT_GPRS_STATE;
 		}
+		else if(xSemaphoreTake(xSemaphore_gps_subscr_recon, 0))
+		{
+			// De init gnss
+			deinit_gps();
+			vTaskDelay(10/portTICK_RATE_MS);
+			// Reconnect GNSS
+			init_gps();
+			send_debug_msg(RECONNECTED_GNSS);
+			xSemaphoreTake(xSemaphore_gps_subscr_recon, 0);
+		}
 		// Send tracking msg
-		else if(xSemaphoreTake(xSemaphore_send_udp, 0))
+		else if((xSemaphoreTake(xSemaphore_has_moved, 0) || (xSemaphoreTake(xSemaphore_send_udp, 0))))
 		{
 			if(create_and_pub_drone_pos())
 			{
+				xSemaphoreGive(xSemaphore_send_timer_reset);
 				cur_tracking_state = TRACKING_STATE;
 				error_counter = 0;
 			}
@@ -503,11 +577,14 @@ void gprs_tracking_state_machine(uint8_t update_mode)
 		break;
 	}
 
-	// Reset gsm modem
+	// Stop gsm modem
 	if(update_mode == STOP_UPDATING_POS)
 	{
-//		reset_gsm_modem();
+		send_start_stop_tracking(STOP_TRACKING_PKG_TYPE);
+		vTaskDelay(200/portTICK_RATE_MS);
+
 		turn_off_modem_pwr_physical();
+		cur_tracking_state = INIT_GPRS_STATE;
 	}
 }
 
@@ -524,34 +601,43 @@ void enter_drone_id_states(void)
 			// Change indicator state
 			change_led_indicator_state(MODULE_POWERED_OFF);
 
-			if(xSemaphoreTake(xSemaphore_next_state, 5000))
+			if(xSemaphoreTake(xSemaphore_droneid_mode_selector, 5000))
 			{
-				change_led_indicator_state(MODULE_ENTERING_UPDATE_MODE);
-				drone_id_state = TRACKING_GPRS;
-				// Remove old user commands
+				if (droneid_mode_selector == POWER_ON)
+				{
+					change_led_indicator_state(MODULE_CONNECTING_GPRS);
+					drone_id_state = TRACKING_GPRS;
+				}
+				xSemaphoreGive(xSemaphore_droneid_mode_selector);
 				remove_old_semaphore_commands();
 			}
+
+
 			break;
 
+
 		case TRACKING_GPRS:
-			// Request new battery voltage mess
 			xSemaphoreGive(xSemaphore_get_new_voltage_sample);
+			// Request new battery voltage mess
 			vTaskDelay(20/portTICK_RATE_MS);
 
-			// Enter update DroneID pos functions
-			if(xSemaphoreTake(xSemaphore_pre_state, 0))
+			bool stop_tracking_flag = false;
+
+			if(xSemaphoreTake(xSemaphore_droneid_mode_selector, 0))
 			{
-				change_led_indicator_state(MODULE_ENTERING_POWER_OFF_MODE);
-				gprs_tracking_state_machine(STOP_UPDATING_POS);
-				drone_id_state = STOP_TRACKING;
+				if (droneid_mode_selector == POWER_OFF)
+				{
+					stop_tracking_flag = true;
+					change_led_indicator_state(MODULE_POWERED_OFF);
+					gprs_tracking_state_machine(STOP_UPDATING_POS);
+					drone_id_state = STOP_TRACKING;
+				}
+				xSemaphoreGive(xSemaphore_droneid_mode_selector);
 			}
-			else if(xSemaphoreTake(xSemaphore_new_trial_state, 0))
+
+			if(!stop_tracking_flag)
 			{
-				gprs_tracking_state_machine(NEW_TRIAL);
-			}
-			else
-			{
-				gprs_tracking_state_machine(UPDATE_POS);
+					gprs_tracking_state_machine(UPDATE_POS);
 			}
 			break;
 		}
@@ -563,18 +649,18 @@ void enter_drone_id_states(void)
 /* DroneID main task */
 void drone_id_main_task(void *arg)
 {
-	// Variable for GGA data
-	xSemaphore_gga_msg_mutex_handle = xSemaphoreCreateMutex();
-
 	// Reset gpgga data semaphore
 	vSemaphoreCreateBinary(xSemaphore_gpgga_reset);
+
+	vSemaphoreCreateBinary(xSemaphore_send_timer_reset);
 
 	// Wait until mutex and queues has been created
 	while(!((xSemaphore_pre_state != NULL) && (xSemaphore_next_state != NULL) &&
 			(xQueue_uart_gsm_send_handle != NULL) && (xSemaphore_uart_gsm_send_handle != NULL) &&
 			(xSemaphore_pressure_temperature_mutex_handle != NULL) && (xSemaphore_send_udp != NULL)&&
-			(xSemaphore_gps_subscr_deacted != NULL) && (xSemaphore_new_trial_state != NULL) &&
-			(xSemaphore_get_new_voltage_sample != NULL)))
+			(xSemaphore_gps_subscr_deacted != NULL) && (xSemaphore_get_new_voltage_sample != NULL) &&
+			(xSemaphore_gga_msg_mutex_handle != NULL) && (xSemaphore_has_moved != NULL) &&
+			(xSemaphore_gps_subscr_recon!= NULL)))
 	{
 		vTaskDelay(200/portTICK_RATE_MS);
 	}

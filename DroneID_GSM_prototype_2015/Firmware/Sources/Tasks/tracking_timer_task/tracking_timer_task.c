@@ -44,7 +44,7 @@
 
 /***************************************************************************/
 /* #defines */
-#define MS_BEFORE_SEND_NEW_PKG				1000
+#define MS_BEFORE_SEND_NEW_PKG				5000
 
 /***************************************************************************/
 /* function prototypes */
@@ -63,10 +63,19 @@ void create_binary_semaphore_to_send_udp(void)
 /* Pass a binary semaphore for every loop itt.*/
 void enter_timer_function(void)
 {
+	uint32_t timer_ms = 0;
+
+
 	while(true)
 	{
-		xSemaphoreGive(xSemaphore_send_udp);
-		vTaskDelay(MS_BEFORE_SEND_NEW_PKG/portTICK_RATE_MS);
+		if (xSemaphoreTake(xSemaphore_send_timer_reset, MS_BEFORE_SEND_NEW_PKG))
+		{
+
+		}
+		else
+		{
+			xSemaphoreGive(xSemaphore_send_udp);
+		}
 	}
 }
 
@@ -74,6 +83,11 @@ void enter_timer_function(void)
 /* Send msg to send udp task*/
 void tracking_timer_task(void *arg)
 {
+	while(!((xSemaphore_send_timer_reset != NULL) ))
+	{
+		vTaskDelay(200/portTICK_RATE_MS);
+	}
+
 	create_binary_semaphore_to_send_udp();
 	vTaskDelay(1000/portTICK_RATE_MS);
 	enter_timer_function();

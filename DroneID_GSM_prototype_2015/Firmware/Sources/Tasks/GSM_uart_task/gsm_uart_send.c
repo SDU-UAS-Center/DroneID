@@ -86,3 +86,4 @@ void gsm_uart_send_task(void *arg)
 		}
 	}
 }
+
